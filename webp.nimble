@@ -1,6 +1,6 @@
 # Package
 
-version       = "0.1.1"
+version       = "0.2.0"
 author        = "Juan Carlos"
 description   = "WebP Tools wrapper for Nim"
 license       = "MIT"
