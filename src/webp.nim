@@ -11,7 +11,6 @@
 ## ----------
 ##
 ## - WebP https://developers.google.com/speed/webp
-## - Nim https://nim-lang.org ``>= 0.18.0``
 
 import osproc, strformat, strutils
 
