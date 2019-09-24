@@ -12,61 +12,67 @@
 ##
 ## - WebP https://developers.google.com/speed/webp
 
-import osproc, strformat, strutils
+import osproc
+
 
 const
-  cwebpVersion*    = staticExec("cwebp -version")    ## CWebP Version (SemVer).
-  dwebpVersion*    = staticExec("dwebp -version")    ## DWebP Version (SemVer).
-  gif2webpVersion* = staticExec("gif2webp -version") ## CWebP Version (SemVer).
-  img2webpVersion* = staticExec("img2webp -version") ## CWebP Version (SemVer).
-
-template comandizer(inputFilename: string, noasm, verbose, threads : bool, body: untyped): untyped =
-  body
-  let cmd = "$1 $2 $3 $4 $5 $6 $7".format(
-    exe,
-    if noasm: "-noasm " else: "",
-    if verbose: "-v " else: "",
-    if threads: "-mt " else: "",
-    if len(outputFilename) > 5: "-o " & quoteShell(outputFilename) else: "-o " & quoteShell(inputFilename & ".webp"),
-    opts,
-    quoteShell(inputFilename))
-  if verbose:
-    echo cmd
-  execCmdEx(cmd)
+  cwebpVersion* = staticExec("cwebp -version")  ## CWebP Version (SemVer).
+  dwebpVersion* = staticExec("dwebp -version")  ## DWebP Version (SemVer).
 
 
-proc cwebp*(inputFilename, outputFilename, preset: string,
-            noasm = false, verbose = false, threads = true, lossless = false, noalpha = false,
-            quality: range[0..100] = 75): tuple =
+template cwebp*(inputFilename: string, outputFilename = "", preset = "drawing",
+    verbose = false, threads = true, lossless = false, noalpha = false,
+    quality: range[0..100] = 50): tuple[output: TaintedString, exitCode: int] =
   ## Compress an image file to a WebP file.
   ## Input format can be either PNG, JPEG, TIFF, WebP.
-  comandizer(inputFilename, noasm, verbose, threads):
-    let
-      x = if lossless: "-lossless " else: ""
-      z = if noalpha: "-noalpha " else: ""
-      exe = "cwebp"
-      opts = fmt"-preset {preset} -q {quality} {x}{z} "
-
-proc dwebp*(inputFilename, outputFilename: string,
-            noasm = false, verbose = false, threads = true): tuple =
-  comandizer(inputFilename, noasm, verbose, threads):
-    let
-      exe  = "dwebp"
-      opts = ""
-
-proc gif2webp*(inputFilename, outputFilename: string,
-               noasm = false, verbose = false, threads = true,
-               quality: range[0..100] = 75): tuple =
-  comandizer(inputFilename, noasm, verbose, threads):
-    let
-      exe = "gif2webp"
-      opts = fmt"-q {quality} -m 6 -metadata none "
+  assert inputFilename.len > 0, "inputFilename must not be empty string"
+  assert preset in ["default", "photo", "picture", "drawing", "icon", "text"]
+  execCmdEx(
+    (if unlikely(verbose): "cwebp -v " else: "cwebp -quiet ") &
+    (if likely(threads): "-mt " else: "") &
+    (if unlikely(lossless): "-lossless " else: "") &
+    (if unlikely(noalpha): "-noalpha " else: "") &
+    "-preset " & preset & " -q " & $quality & " -o " &
+    (if outputFilename.len == 0: quoteShell(inputFilename & ".webp") else: quoteShell(outputFilename)) &
+    " " & quoteShell(inputFilename)
+  )
 
 
-when is_main_module:
+template dwebp*(inputFilename, outputFilename: string, verbose = false,
+    threads = true): tuple[output: TaintedString, exitCode: int] =
+  assert inputFilename.len > 0, "inputFilename must not be empty string"
+  assert outputFilename.len > 0, "outputFilename must not be empty string"
+  execCmdEx(
+    (if unlikely(verbose): "dwebp -v " else: "dwebp -quiet ") &
+    (if likely(threads): "-mt -o " else: "-o ") &
+    quoteShell(outputFilename) & " " &
+    quoteShell(inputFilename)
+  )
+
+
+template gif2webp*(inputFilename: string, outputFilename = "", verbose = false,
+    threads = true, quality: range[0..100] = 75): tuple[output: TaintedString, exitCode: int] =
+  assert inputFilename.len > 0, "inputFilename must not be empty string"
+  execCmdEx(
+    "gif2webp -m 6 -metadata none " &
+    (if unlikely(verbose): "-v " else: "-quiet ") &
+    (if likely(threads): "-mt -o " else: "-o ") &
+    (if outputFilename.len == 0: quoteShell(inputFilename & ".webp") else: quoteShell(outputFilename)) &
+    " " & quoteShell(inputFilename)
+  )
+
+
+runnableExamples:
   echo cwebpVersion
   echo dwebpVersion
-  echo gif2webpVersion
-  echo cwebp("in.jpg", "out.webp", "text")
-  echo dwebp("out.webp", "in.jpg")
-  echo gif2webp("in.gif", "out.webp")
+  echo cwebp("in.jpg")
+  echo dwebp("out.jpg.webp", "in.jpg")
+  echo gif2webp("in.gif")
+
+
+when isMainModule:
+  echo cwebpVersion
+  echo dwebpVersion
+  echo cwebp("in.jpg")
+  echo dwebp("out.jpg.webp", "in.jpg")
+  echo gif2webp("in.gif")
